@@ -1,40 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using OCTOBER.EF.Data;
-using static System.Collections.Specialized.BitVector32;
+using OCTOBER.EF.Models;
+using OCTOBER.Server.Controllers.Base;
+using OCTOBER.Shared.DTO;
+using System.Diagnostics;
+using Telerik.Blazor.Components;
+using Telerik.DataSource.Extensions;
+using Telerik.SvgIcons;
 
 namespace OCTOBER.Server.Controllers.UD
 {
-    public class SchoolController : BaseController, GenericRestController<SectionDTO>
+    [Route("api/[controller]")]
+    [ApiController]
+    public class GradeConversionController : BaseController, GenericRestController<GradeConversionDTO>
     {
-        public SchoolController(OCTOBEROracleContext context,
-                                IHttpContextAccessor httpContextAccessor,
-                                IMemoryCache memoryCache)
-                : base(context, httpContextAccessor)
+        public GradeConversionController(OCTOBEROracleContext context,
+            IHttpContextAccessor httpContextAccessor,
+            IMemoryCache memoryCache)
+        : base(context, httpContextAccessor)
         {
         }
 
         [HttpDelete]
-        [Route("Delete/{SchoolID}")]
-
-        public async Task<IActionResult> Delete(int SectionID)
+        [Route("Delete/{SchoolID}/{LetterGrade}")]
+        public async Task<IActionResult> Delete(int SchoolID, string LetterGrade)
         {
-            Debugger.Launch();
             try
             {
                 await _context.Database.BeginTransactionAsync();
 
-                var itm = await _context.Sections.Where(x => x.SectionId == SectionID).FirstOrDefaultAsync();
+                var itm = await _context.GradeConversions.Where(x => x.SchoolId == SchoolID)
+                    .Where(x => x.LetterGrade == LetterGrade).FirstOrDefaultAsync();
 
                 if (itm != null)
                 {
-                    _context.Sections.Remove(itm);
+                    _context.GradeConversions.Remove(itm);
                 }
                 await _context.SaveChangesAsync();
                 await _context.Database.CommitTransactionAsync();
@@ -49,6 +51,11 @@ namespace OCTOBER.Server.Controllers.UD
             }
         }
 
+        public Task<IActionResult> Delete(int KeyVal)
+        {
+            throw new NotImplementedException();
+        }
+
         [HttpGet]
         [Route("Get")]
         public async Task<IActionResult> Get()
@@ -57,21 +64,13 @@ namespace OCTOBER.Server.Controllers.UD
             {
                 await _context.Database.BeginTransactionAsync();
 
-                var result = await _context.Sections.Select(sp => new SectionDTO
+                var result = await _context.GradeConversions.Select(sp => new GradeConversionDTO
                 {
-                    Capacity = sp.Capacity,
-                    CourseNo = sp.CourseNo,
-                    CreatedBy = sp.CreatedBy,
-                    CreatedDate = sp.CreatedDate,
-                    InstructorId = sp.InstructorId,
-                    Location = sp.Location,
-                    ModifiedBy = sp.ModifiedBy,
-                    ModifiedDate = sp.ModifiedDate,
                     SchoolId = sp.SchoolId,
-                    SectionId = sp.SectionId,
-                    SectionNo = sp.SectionNo,
-                    StartDateTime = sp.StartDateTime
-
+                    LetterGrade = sp.LetterGrade,
+                    GradePoint = sp.GradePoint,
+                    MaxGrade = sp.MaxGrade,
+                    MinGrade = sp.MinGrade
                 })
                 .ToListAsync();
                 await _context.Database.RollbackTransactionAsync();
@@ -84,35 +83,28 @@ namespace OCTOBER.Server.Controllers.UD
                 return StatusCode(StatusCodes.Status417ExpectationFailed, "An Error has occurred");
             }
         }
-
-
         [HttpGet]
-        [Route("Get/{SchoolID}/{SectionID}")]
-        public async Task<IActionResult> Get(int SchoolID, int SectionID)
+        [Route("Get/{SchoolID}/{LetterGrade}")]
+        public async Task<IActionResult> Get(int SchoolID, string LetterGrade)
         {
             try
             {
                 await _context.Database.BeginTransactionAsync();
 
-                SectionDTO? result = await _context.Sections
+                GradeConversionDTO? result = await _context
+                    .GradeConversions
                     .Where(x => x.SchoolId == SchoolID)
-                    .Where(x => x.SectionId == SectionID)
-                    .Select(sp => new SectionDTO
-                    {
-                        Capacity = sp.Capacity,
-                        CourseNo = sp.CourseNo,
-                        CreatedBy = sp.CreatedBy,
-                        CreatedDate = sp.CreatedDate,
-                        InstructorId = sp.InstructorId,
-                        Location = sp.Location,
-                        ModifiedBy = sp.ModifiedBy,
-                        ModifiedDate = sp.ModifiedDate,
-                        SchoolId = sp.SchoolId,
-                        SectionId = sp.SectionId,
-                        SectionNo = sp.SectionNo,
-                        StartDateTime = sp.StartDateTime
-                    })
+                    .Where(x => x.LetterGrade == LetterGrade)
+                     .Select(sp => new GradeConversionDTO
+                     {
+                         SchoolId = sp.SchoolId,
+                         LetterGrade = sp.LetterGrade,
+                         GradePoint = sp.GradePoint,
+                         MaxGrade = sp.MaxGrade,
+                         MinGrade = sp.MinGrade
+                     })
                 .SingleOrDefaultAsync();
+
                 await _context.Database.RollbackTransactionAsync();
                 return Ok(result);
             }
@@ -131,28 +123,26 @@ namespace OCTOBER.Server.Controllers.UD
 
         [HttpPost]
         [Route("Post")]
-        public async Task<IActionResult> Post([FromBody] SectionDTO _SectionDTO)
+        public async Task<IActionResult> Post([FromBody] GradeConversionDTO _GradeConversionDTO)
         {
             try
             {
                 await _context.Database.BeginTransactionAsync();
 
-                var itm = await _context.Sections.Where(x => x.SectionId == _SectionDTO.SectionId).FirstOrDefaultAsync();
+                var itm = await _context.GradeConversions.Where(x => x.SchoolId == _GradeConversionDTO.SchoolId)
+                    .Where(x => x.LetterGrade == _GradeConversionDTO.LetterGrade).FirstOrDefaultAsync();
 
                 if (itm == null)
                 {
-                    Section s = new Section
+                    GradeConversion e = new GradeConversion
                     {
-
-                        SectionId = _SectionDTO.SectionId,
-                        SectionNo = _SectionDTO.SectionNo,
-                        CourseNo = _SectionDTO.CourseNo,
-                        StartDateTime = _SectionDTO.StartDateTime,
-                        Location = _SectionDTO.Location,
-                        InstructorId = _SectionDTO.InstructorId,
-                        Capacity = _SectionDTO.Capacity
+                        SchoolId = _GradeConversionDTO.SchoolId,
+                        LetterGrade = _GradeConversionDTO.LetterGrade,
+                        GradePoint = _GradeConversionDTO.GradePoint,
+                        MaxGrade = (byte)_GradeConversionDTO.MaxGrade,
+                        MinGrade = (byte)_GradeConversionDTO.MinGrade
                     };
-                    _context.Sections.Add(s);
+                    _context.GradeConversions.Add(e);
                     await _context.SaveChangesAsync();
                     await _context.Database.CommitTransactionAsync();
                 }
@@ -165,26 +155,24 @@ namespace OCTOBER.Server.Controllers.UD
                 return StatusCode(StatusCodes.Status417ExpectationFailed, "An Error has occurred");
             }
         }
-
-
         [HttpPut]
         [Route("Put")]
-        public async Task<IActionResult> Put([FromBody] SectionDTO _SectionDTO)
+        public async Task<IActionResult> Put([FromBody] GradeConversionDTO _GradeConversionDTO)
         {
             try
             {
                 await _context.Database.BeginTransactionAsync();
 
-                var itm = await _context.Sections.Where(x => x.SectionId == _SectionDTO.SectionId).FirstOrDefaultAsync();
+                var itm = await _context.GradeConversions.Where(x => x.SchoolId == _GradeConversionDTO.SchoolId)
+                    .Where(x => x.LetterGrade == _GradeConversionDTO.LetterGrade).FirstOrDefaultAsync();
 
-                itm.SectionNo = _SectionDTO.SectionNo;
-                itm.CourseNo = _SectionDTO.CourseNo;
-                itm.StartDateTime = _SectionDTO.StartDateTime;
-                itm.Location = _SectionDTO.Location;
-                itm.InstructorId = _SectionDTO.InstructorId;
-                itm.Capacity = _SectionDTO.Capacity;
+                itm.SchoolId = _GradeConversionDTO.SchoolId;
+                itm.LetterGrade = _GradeConversionDTO.LetterGrade;
+                itm.GradePoint = _GradeConversionDTO.GradePoint;
+                itm.MaxGrade = (byte)_GradeConversionDTO.MaxGrade;
+                itm.MinGrade = (byte)_GradeConversionDTO.MinGrade;
 
-                _context.Sections.Update(itm);
+                _context.GradeConversions.Update(itm);
                 await _context.SaveChangesAsync();
                 await _context.Database.CommitTransactionAsync();
 
@@ -198,5 +186,4 @@ namespace OCTOBER.Server.Controllers.UD
             }
         }
     }
-
 }
